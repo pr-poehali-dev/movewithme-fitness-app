@@ -1,6 +1,8 @@
 import { useState } from "react";
 import Icon from "@/components/ui/icon";
 import ProfileScreen from "@/components/ProfileScreen";
+import WorkoutsScreen from "@/components/WorkoutsScreen";
+import ProgressScreen from "@/components/ProgressScreen";
 
 const WORKOUTS = [
   {
@@ -83,6 +85,10 @@ export default function Index() {
 
         {activeNav === 4 ? (
           <ProfileScreen />
+        ) : activeNav === 1 ? (
+          <WorkoutsScreen />
+        ) : activeNav === 2 ? (
+          <ProgressScreen />
         ) : (
         <>
         {/* Header */}
