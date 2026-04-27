@@ -1,5 +1,6 @@
 import { useState } from "react";
 import Icon from "@/components/ui/icon";
+import ProfileScreen from "@/components/ProfileScreen";
 
 const WORKOUTS = [
   {
@@ -80,6 +81,10 @@ export default function Index() {
           </div>
         </div>
 
+        {activeNav === 4 ? (
+          <ProfileScreen />
+        ) : (
+        <>
         {/* Header */}
         <div className="px-6 pt-2 pb-4 flex justify-between items-center opacity-0-init animate-fade-in">
           <div>
@@ -274,6 +279,8 @@ export default function Index() {
           </div>
         </div>
 
+        </>
+        )}
         {/* Bottom Nav */}
         <div
           className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-100 px-2 pt-3 pb-5"
