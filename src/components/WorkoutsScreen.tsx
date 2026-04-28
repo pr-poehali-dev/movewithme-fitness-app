@@ -1,5 +1,6 @@
 import { useState } from "react";
 import Icon from "@/components/ui/icon";
+import WorkoutDetailScreen from "@/components/WorkoutDetailScreen";
 
 const CATEGORIES = ["Все", "Кардио", "Силовая", "HIIT", "Растяжка", "Йога"];
 
@@ -81,6 +82,11 @@ const LEVEL_COLOR: Record<string, string> = {
 export default function WorkoutsScreen() {
   const [activeCategory, setActiveCategory] = useState("Все");
   const [favorites, setFavorites] = useState<number[]>([1]);
+  const [openWorkoutId, setOpenWorkoutId] = useState<number | null>(null);
+
+  if (openWorkoutId === 1) {
+    return <WorkoutDetailScreen onBack={() => setOpenWorkoutId(null)} />;
+  }
 
   const filtered =
     activeCategory === "Все"
@@ -227,6 +233,7 @@ export default function WorkoutsScreen() {
                     {w.level}
                   </span>
                   <button
+                    onClick={() => setOpenWorkoutId(w.id)}
                     className="flex items-center gap-1 text-[11px] font-bold text-[#4A90E2] font-montserrat"
                   >
                     Начать
