@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import Icon from "@/components/ui/icon";
 
 interface Props {
@@ -13,8 +13,10 @@ const EXERCISES = [
     duration: 45,
     rest: 15,
     image: "https://cdn.poehali.dev/projects/d5cc102d-4ae7-4efd-aa96-14c3b55399cc/files/9489d53b-e990-47e1-ba33-a198dac0d584.jpg",
-    tip: "Держите спину прямо, приземляйтесь мягко",
+    tip: "Держите спину прямо, приземляйтесь мягко на носки",
+    muscles: "Ноги · Плечи",
     color: "#4A90E2",
+    sets: 2,
   },
   {
     id: 2,
@@ -22,8 +24,10 @@ const EXERCISES = [
     duration: 30,
     rest: 10,
     image: "https://cdn.poehali.dev/projects/d5cc102d-4ae7-4efd-aa96-14c3b55399cc/files/a3fc9cd9-5bb8-415e-a823-449a5183c0f5.jpg",
-    tip: "Руки прямые, движение плавное",
+    tip: "Руки прямые, круговые движения вперёд и назад",
+    muscles: "Плечи · Разминка",
     color: "#F5A623",
+    sets: 1,
   },
   {
     id: 3,
@@ -31,8 +35,10 @@ const EXERCISES = [
     duration: 40,
     rest: 20,
     image: "https://cdn.poehali.dev/projects/d5cc102d-4ae7-4efd-aa96-14c3b55399cc/files/c8d7aa09-3d94-48a2-8c33-002cdf9a2f89.jpg",
-    tip: "Поднимайте колени до уровня пояса",
+    tip: "Поднимайте колени до уровня пояса, руки активно работают",
+    muscles: "Ноги · Пресс",
     color: "#50C878",
+    sets: 2,
   },
   {
     id: 4,
@@ -40,158 +46,152 @@ const EXERCISES = [
     duration: 45,
     rest: 15,
     image: "https://cdn.poehali.dev/projects/d5cc102d-4ae7-4efd-aa96-14c3b55399cc/files/e8866576-1801-4d4d-a2a4-2c732a70d7a6.jpg",
-    tip: "Колени над стопами, спина прямая",
+    tip: "Колени над стопами, спина прямая, садитесь до параллели",
+    muscles: "Ноги · Ягодицы",
     color: "#9B8EFF",
+    sets: 2,
   },
   {
     id: 5,
-    title: "Прыжки Джека",
-    duration: 45,
-    rest: 15,
-    image: "https://cdn.poehali.dev/projects/d5cc102d-4ae7-4efd-aa96-14c3b55399cc/files/9489d53b-e990-47e1-ba33-a198dac0d584.jpg",
-    tip: "Держите темп до конца подхода",
-    color: "#4A90E2",
-  },
-  {
-    id: 6,
-    title: "Высокие колени",
-    duration: 40,
-    rest: 20,
-    image: "https://cdn.poehali.dev/projects/d5cc102d-4ae7-4efd-aa96-14c3b55399cc/files/c8d7aa09-3d94-48a2-8c33-002cdf9a2f89.jpg",
-    tip: "Финальный раунд — выложитесь на 100%",
-    color: "#50C878",
-  },
-  {
-    id: 7,
-    title: "Приседания",
-    duration: 45,
-    rest: 15,
-    image: "https://cdn.poehali.dev/projects/d5cc102d-4ae7-4efd-aa96-14c3b55399cc/files/e8866576-1801-4d4d-a2a4-2c732a70d7a6.jpg",
-    tip: "Последний подход — держите технику",
-    color: "#9B8EFF",
-  },
-  {
-    id: 8,
     title: "Вращение руками",
     duration: 30,
     rest: 0,
     image: "https://cdn.poehali.dev/projects/d5cc102d-4ae7-4efd-aa96-14c3b55399cc/files/a3fc9cd9-5bb8-415e-a823-449a5183c0f5.jpg",
     tip: "Заминка — медленно и плавно, дышите глубоко",
+    muscles: "Плечи · Заминка",
     color: "#F5A623",
+    sets: 1,
   },
 ];
 
-type Phase = "exercise" | "rest" | "countdown";
+// Разворачиваем подходы в отдельные шаги
+const STEPS = EXERCISES.flatMap((ex) =>
+  Array.from({ length: ex.sets }, (_, i) => ({
+    ...ex,
+    stepId: `${ex.id}-${i}`,
+    setNum: i + 1,
+    totalSets: ex.sets,
+    isLastSet: i === ex.sets - 1,
+  }))
+);
+
+type Phase = "ready" | "exercise" | "rest";
 
 export default function ActiveWorkoutScreen({ onBack, onFinish }: Props) {
-  const [exIdx, setExIdx] = useState(0);
-  const [phase, setPhase] = useState<Phase>("countdown");
-  const [timeLeft, setTimeLeft] = useState(3);
-  const [paused, setPaused] = useState(false);
+  const [stepIdx, setStepIdx] = useState(0);
+  const [phase, setPhase] = useState<Phase>("ready");
+  const [timeLeft, setTimeLeft] = useState(0);
+  const [running, setRunning] = useState(false);
   const [showQuit, setShowQuit] = useState(false);
-  const [totalElapsed, setTotalElapsed] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const ex = EXERCISES[exIdx];
-  const isLast = exIdx === EXERCISES.length - 1;
+  const step = STEPS[stepIdx];
+  const isLastStep = stepIdx === STEPS.length - 1;
+  const completedSteps = stepIdx;
+  const overallPct = (completedSteps / STEPS.length) * 100;
 
-  const phaseDuration =
-    phase === "countdown" ? 3 : phase === "exercise" ? ex.duration : ex.rest;
-
-  const progressPct = ((phaseDuration - timeLeft) / phaseDuration) * 100;
-
-  const goNextPhase = useCallback(() => {
-    if (phase === "countdown") {
-      setPhase("exercise");
-      setTimeLeft(ex.duration);
-    } else if (phase === "exercise") {
-      if (ex.rest > 0) {
-        setPhase("rest");
-        setTimeLeft(ex.rest);
-      } else {
-        if (isLast) {
-          onFinish();
-        } else {
-          setExIdx((i) => i + 1);
-          setPhase("countdown");
-          setTimeLeft(3);
-        }
-      }
-    } else {
-      if (isLast) {
-        onFinish();
-      } else {
-        setExIdx((i) => i + 1);
-        setPhase("countdown");
-        setTimeLeft(3);
-      }
-    }
-  }, [phase, ex, isLast, onFinish]);
-
+  // Таймер
   useEffect(() => {
-    if (paused) return;
+    if (!running) {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      return;
+    }
     intervalRef.current = setInterval(() => {
       setTimeLeft((t) => {
         if (t <= 1) {
+          clearInterval(intervalRef.current!);
+          setRunning(false);
           return 0;
         }
         return t - 1;
       });
-      if (phase !== "rest") {
-        setTotalElapsed((e) => e + 1);
-      }
     }, 1000);
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [paused, phase, exIdx]);
+  }, [running]);
 
+  // Когда таймер дошёл до 0
   useEffect(() => {
-    if (timeLeft === 0) {
-      goNextPhase();
+    if (running || timeLeft !== 0) return;
+    if (phase === "exercise") {
+      if (step.rest > 0) {
+        setPhase("rest");
+        setTimeLeft(step.rest);
+        // Отдых запускается автоматически
+        setRunning(true);
+      } else {
+        // Нет отдыха — переходим к следующему сразу
+        advanceStep();
+      }
     }
-  }, [timeLeft, goNextPhase]);
+    // rest заканчивается — просто ждём нажатия «Готов» (running=false, timeLeft=0)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timeLeft, running]);
 
-  const skipExercise = () => {
-    if (intervalRef.current) clearInterval(intervalRef.current);
-    goNextPhase();
+  const startExercise = () => {
+    setPhase("exercise");
+    setTimeLeft(step.duration);
+    setRunning(true);
   };
 
-  const nextExImage =
-    exIdx + 1 < EXERCISES.length ? EXERCISES[exIdx + 1].image : null;
-  const nextExTitle =
-    exIdx + 1 < EXERCISES.length ? EXERCISES[exIdx + 1].title : "Финиш!";
+  const advanceStep = () => {
+    if (isLastStep) {
+      onFinish();
+    } else {
+      setStepIdx((i) => i + 1);
+      setPhase("ready");
+      setTimeLeft(0);
+      setRunning(false);
+    }
+  };
 
-  const phaseLabel =
-    phase === "countdown" ? "Приготовься!" : phase === "exercise" ? "Выполняй" : "Отдых";
+  const skipCurrent = () => {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    setRunning(false);
+    if (phase === "exercise" && step.rest > 0) {
+      setPhase("rest");
+      setTimeLeft(step.rest);
+      setRunning(true);
+    } else {
+      advanceStep();
+    }
+  };
+
+  const phaseDuration = phase === "exercise" ? step.duration : step.rest;
+  const progressPct = phaseDuration > 0 ? ((phaseDuration - timeLeft) / phaseDuration) * 100 : 0;
+
+  const nextStep = stepIdx + 1 < STEPS.length ? STEPS[stepIdx + 1] : null;
+
   const phaseColor =
-    phase === "countdown" ? "#F5A623" : phase === "exercise" ? ex.color : "#50C878";
+    phase === "rest" ? "#50C878" : step.color;
 
-  const totalWorkoutTime = EXERCISES.reduce((s, e) => s + e.duration + e.rest, 0) + EXERCISES.length * 3;
-  const overallPct = Math.min((totalElapsed / totalWorkoutTime) * 100, 100);
+  const circumference = 2 * Math.PI * 52;
 
   return (
-    <div className="flex flex-col h-full bg-[#0e1525] relative overflow-hidden">
+    <div className="flex flex-col h-full bg-[#0e1525] overflow-hidden">
+
       {/* Quit modal */}
       {showQuit && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-8">
-          <div className="bg-white rounded-3xl p-6 w-full">
-            <h3 className="text-base font-bold text-[#1a1e2e] font-montserrat text-center mb-1">
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-8">
+          <div className="bg-[#1a2235] rounded-3xl p-6 w-full border border-white/10">
+            <h3 className="text-base font-bold text-white font-montserrat text-center mb-1">
               Завершить тренировку?
             </h3>
-            <p className="text-xs text-gray-400 font-golos text-center mb-5">
+            <p className="text-xs text-white/40 font-golos text-center mb-5">
               Прогресс этой сессии не сохранится
             </p>
             <div className="flex gap-3">
               <button
                 onClick={() => setShowQuit(false)}
-                className="flex-1 py-3 rounded-2xl bg-[#f0f4ff] text-[#4A90E2] text-sm font-bold font-montserrat"
+                className="flex-1 py-3 rounded-2xl text-sm font-bold font-montserrat"
+                style={{ background: "rgba(74,144,226,0.15)", color: "#4A90E2" }}
               >
                 Продолжить
               </button>
               <button
                 onClick={onBack}
-                className="flex-1 py-3 rounded-2xl bg-red-500 text-white text-sm font-bold font-montserrat"
+                className="flex-1 py-3 rounded-2xl bg-red-500/90 text-white text-sm font-bold font-montserrat"
               >
                 Выйти
               </button>
@@ -203,22 +203,21 @@ export default function ActiveWorkoutScreen({ onBack, onFinish }: Props) {
       {/* Top bar */}
       <div className="flex items-center justify-between px-5 pt-5 pb-3 flex-shrink-0">
         <button
-          onClick={() => { setPaused(true); setShowQuit(true); }}
+          onClick={() => { setRunning(false); setShowQuit(true); }}
           className="w-9 h-9 rounded-2xl bg-white/10 flex items-center justify-center"
         >
           <Icon name="X" size={16} className="text-white" />
         </button>
         <div className="text-center">
-          <p className="text-white/40 text-[10px] font-golos">
-            {exIdx + 1} из {EXERCISES.length}
-          </p>
+          <p className="text-white/40 text-[10px] font-golos">{stepIdx + 1} из {STEPS.length}</p>
           <p className="text-white text-sm font-bold font-montserrat">Утренний старт</p>
         </div>
         <button
-          onClick={() => setPaused((v) => !v)}
+          onClick={() => setRunning((v) => !v)}
           className="w-9 h-9 rounded-2xl bg-white/10 flex items-center justify-center"
+          disabled={phase === "ready"}
         >
-          <Icon name={paused ? "Play" : "Pause"} size={16} className="text-white" />
+          <Icon name={running ? "Pause" : "Play"} size={16} className={phase === "ready" ? "text-white/20" : "text-white"} />
         </button>
       </div>
 
@@ -226,28 +225,43 @@ export default function ActiveWorkoutScreen({ onBack, onFinish }: Props) {
       <div className="px-5 mb-4 flex-shrink-0">
         <div className="h-1 bg-white/10 rounded-full overflow-hidden">
           <div
-            className="h-full rounded-full transition-all duration-1000"
+            className="h-full rounded-full transition-all duration-500"
             style={{ width: `${overallPct}%`, background: "linear-gradient(90deg, #4A90E2, #7ab8f0)" }}
           />
+        </div>
+        <div className="flex justify-between mt-1.5">
+          {STEPS.map((s, i) => (
+            <div
+              key={s.stepId}
+              className="h-1.5 rounded-full transition-all duration-300"
+              style={{
+                flex: 1,
+                marginRight: i < STEPS.length - 1 ? "3px" : 0,
+                background:
+                  i < stepIdx
+                    ? "#4A90E2"
+                    : i === stepIdx
+                    ? phaseColor
+                    : "rgba(255,255,255,0.1)",
+              }}
+            />
+          ))}
         </div>
       </div>
 
       {/* Exercise image */}
-      <div className="px-5 mb-5 flex-shrink-0">
-        <div
-          className="relative rounded-3xl overflow-hidden"
-          style={{ height: "200px" }}
-        >
+      <div className="px-5 mb-4 flex-shrink-0">
+        <div className="relative rounded-3xl overflow-hidden" style={{ height: "175px" }}>
           <img
-            key={ex.id}
-            src={ex.image}
-            alt={ex.title}
+            key={step.stepId}
+            src={step.image}
+            alt={step.title}
             className="w-full h-full object-cover"
-            style={{ animation: "fadeIn 0.4s ease" }}
+            style={{ filter: phase === "rest" ? "grayscale(0.4) brightness(0.7)" : "none", transition: "filter 0.3s" }}
           />
           <div
             className="absolute inset-0"
-            style={{ background: "linear-gradient(to bottom, transparent 40%, rgba(14,21,37,0.9) 100%)" }}
+            style={{ background: "linear-gradient(to bottom, transparent 30%, rgba(14,21,37,0.92) 100%)" }}
           />
 
           {/* Phase badge */}
@@ -255,93 +269,171 @@ export default function ActiveWorkoutScreen({ onBack, onFinish }: Props) {
             className="absolute top-3 left-3 px-3 py-1 rounded-xl text-xs font-bold font-montserrat"
             style={{ background: phaseColor, color: "white" }}
           >
-            {phaseLabel}
+            {phase === "ready" ? "Готовься" : phase === "exercise" ? "Выполняй" : "Отдых"}
           </div>
 
-          {/* Exercise title on image */}
-          <div className="absolute bottom-4 left-4 right-4">
-            <h3 className="text-xl font-bold text-white font-montserrat leading-tight">
-              {phase === "rest" ? "Отдых" : ex.title}
+          {/* Sets badge */}
+          {step.totalSets > 1 && (
+            <div className="absolute top-3 right-3 px-3 py-1 rounded-xl text-xs font-bold font-montserrat bg-white/15 text-white">
+              Подход {step.setNum}/{step.totalSets}
+            </div>
+          )}
+
+          {/* Title */}
+          <div className="absolute bottom-3 left-4 right-4">
+            <h3 className="text-lg font-bold text-white font-montserrat leading-tight">
+              {phase === "rest" ? "Отдыхай" : step.title}
             </h3>
-            <p className="text-white/50 text-xs font-golos mt-0.5">{ex.tip}</p>
+            <p className="text-white/50 text-[11px] font-golos mt-0.5">
+              {phase === "rest" ? "Следующий подход начнётся по твоей команде" : step.muscles}
+            </p>
           </div>
         </div>
       </div>
 
-      {/* Timer ring */}
-      <div className="flex flex-col items-center mb-6 flex-shrink-0">
-        <div className="relative w-32 h-32">
+      {/* Timer + CTA zone */}
+      <div className="flex items-center px-5 gap-5 mb-4 flex-shrink-0">
+
+        {/* Timer ring */}
+        <div className="relative flex-shrink-0" style={{ width: 100, height: 100 }}>
           <svg className="w-full h-full -rotate-90" viewBox="0 0 120 120">
-            <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="8" />
-            <circle
-              cx="60" cy="60" r="52"
-              fill="none"
-              stroke={phaseColor}
-              strokeWidth="8"
-              strokeLinecap="round"
-              strokeDasharray={`${2 * Math.PI * 52}`}
-              strokeDashoffset={`${2 * Math.PI * 52 * (1 - progressPct / 100)}`}
-              style={{ transition: "stroke-dashoffset 0.9s linear, stroke 0.3s" }}
-            />
+            <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="7" />
+            {phase !== "ready" && (
+              <circle
+                cx="60" cy="60" r="52"
+                fill="none"
+                stroke={phaseColor}
+                strokeWidth="7"
+                strokeLinecap="round"
+                strokeDasharray={circumference}
+                strokeDashoffset={circumference * (1 - progressPct / 100)}
+                style={{ transition: "stroke-dashoffset 0.9s linear, stroke 0.3s" }}
+              />
+            )}
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span
-              className="text-4xl font-bold font-montserrat"
-              style={{ color: timeLeft <= 5 && phase !== "countdown" ? "#FF7E7E" : "white" }}
-            >
-              {timeLeft}
-            </span>
-            <span className="text-white/40 text-[10px] font-golos mt-0.5">секунд</span>
-          </div>
-        </div>
-
-        {paused && (
-          <div className="mt-3 bg-white/10 px-4 py-1.5 rounded-xl">
-            <span className="text-white/60 text-xs font-golos">Пауза</span>
-          </div>
-        )}
-      </div>
-
-      {/* Next exercise preview */}
-      <div className="px-5 mb-5 flex-shrink-0">
-        <div className="bg-white/8 rounded-2xl p-3 flex items-center gap-3" style={{ background: "rgba(255,255,255,0.06)" }}>
-          <div className="w-10 h-10 rounded-xl overflow-hidden flex-shrink-0 bg-white/10">
-            {nextExImage ? (
-              <img src={nextExImage} alt={nextExTitle} className="w-full h-full object-cover opacity-70" />
+            {phase === "ready" ? (
+              <Icon name="Dumbbell" size={26} className="text-white/30" />
             ) : (
-              <div className="w-full h-full flex items-center justify-center">
-                <span className="text-lg">🏁</span>
-              </div>
+              <>
+                <span
+                  className="text-3xl font-bold font-montserrat leading-none"
+                  style={{ color: timeLeft <= 5 ? "#FF7E7E" : "white" }}
+                >
+                  {timeLeft}
+                </span>
+                <span className="text-white/30 text-[9px] font-golos mt-0.5">сек</span>
+              </>
             )}
           </div>
-          <div>
-            <p className="text-white/40 text-[10px] font-golos">Следующее</p>
-            <p className="text-white text-xs font-semibold font-montserrat">{nextExTitle}</p>
-          </div>
-          <button
-            onClick={skipExercise}
-            className="ml-auto flex items-center gap-1 bg-white/10 px-3 py-1.5 rounded-xl text-white/60 text-xs font-golos"
-          >
-            Пропустить
-            <Icon name="ChevronRight" size={12} className="text-white/40" />
-          </button>
+        </div>
+
+        {/* Info + CTA */}
+        <div className="flex-1 flex flex-col gap-2.5">
+          {phase === "ready" && (
+            <>
+              <p className="text-white/50 text-xs font-golos leading-relaxed">{step.tip}</p>
+              <div className="flex gap-2 items-center text-white/30 text-xs font-golos">
+                <Icon name="Clock" size={12} className="text-white/25" />
+                {step.duration} секунд
+              </div>
+              <button
+                onClick={startExercise}
+                className="w-full py-3 rounded-2xl text-sm font-bold text-white font-montserrat flex items-center justify-center gap-2 active:scale-95 transition-transform"
+                style={{
+                  background: `linear-gradient(135deg, ${step.color}, ${step.color}bb)`,
+                  boxShadow: `0 6px 20px ${step.color}50`,
+                }}
+              >
+                <Icon name="Play" size={15} className="text-white" />
+                Старт
+              </button>
+            </>
+          )}
+
+          {phase === "exercise" && (
+            <>
+              <p className="text-white/50 text-xs font-golos leading-relaxed">{step.tip}</p>
+              <button
+                onClick={skipCurrent}
+                className="w-full py-3 rounded-2xl text-sm font-semibold font-montserrat flex items-center justify-center gap-2"
+                style={{ background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.5)" }}
+              >
+                <Icon name="ChevronRight" size={15} className="text-white/40" />
+                Пропустить
+              </button>
+            </>
+          )}
+
+          {phase === "rest" && (
+            <>
+              <p className="text-white/40 text-xs font-golos">
+                {timeLeft > 0 ? "Отдыхай, следующий подход скоро" : "Можешь начинать!"}
+              </p>
+              <button
+                onClick={advanceStep}
+                className="w-full py-3 rounded-2xl text-sm font-bold text-white font-montserrat flex items-center justify-center gap-2 active:scale-95 transition-transform"
+                style={{
+                  background: timeLeft > 0
+                    ? "rgba(255,255,255,0.08)"
+                    : "linear-gradient(135deg, #50C878, #3aaf60)",
+                  boxShadow: timeLeft > 0 ? "none" : "0 6px 20px rgba(80,200,120,0.4)",
+                  color: timeLeft > 0 ? "rgba(255,255,255,0.4)" : "white",
+                }}
+              >
+                <Icon name="CheckCheck" size={15} className={timeLeft > 0 ? "text-white/30" : "text-white"} />
+                {isLastStep ? "Завершить" : "Готов, дальше"}
+              </button>
+            </>
+          )}
         </div>
       </div>
 
-      {/* Exercise dots */}
+      {/* Tip card – only in exercise phase */}
+      {phase === "exercise" && (
+        <div className="px-5 mb-4 flex-shrink-0">
+          <div
+            className="rounded-2xl px-4 py-3 flex items-center gap-3"
+            style={{ background: `${step.color}18`, border: `1px solid ${step.color}30` }}
+          >
+            <Icon name="Lightbulb" size={15} style={{ color: step.color, flexShrink: 0 }} />
+            <p className="text-xs font-golos" style={{ color: `${step.color}dd` }}>{step.tip}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Next up */}
       <div className="px-5 flex-shrink-0">
-        <div className="flex justify-center gap-1.5">
-          {EXERCISES.map((_, i) => (
+        <div
+          className="rounded-2xl p-3 flex items-center gap-3"
+          style={{ background: "rgba(255,255,255,0.05)" }}
+        >
+          <div className="w-10 h-10 rounded-xl overflow-hidden flex-shrink-0 bg-white/10">
+            {nextStep ? (
+              <img src={nextStep.image} alt={nextStep.title} className="w-full h-full object-cover opacity-60" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-lg">🏁</div>
+            )}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-white/30 text-[10px] font-golos">Следующее</p>
+            <p className="text-white/80 text-xs font-semibold font-montserrat truncate">
+              {nextStep ? nextStep.title : "Финиш!"}
+            </p>
+            {nextStep && nextStep.totalSets > 1 && (
+              <p className="text-white/25 text-[10px] font-golos">
+                Подход {nextStep.setNum}/{nextStep.totalSets}
+              </p>
+            )}
+          </div>
+          {nextStep && (
             <div
-              key={i}
-              className="rounded-full transition-all duration-300"
-              style={{
-                width: i === exIdx ? "20px" : "6px",
-                height: "6px",
-                background: i < exIdx ? "#4A90E2" : i === exIdx ? phaseColor : "rgba(255,255,255,0.15)",
-              }}
-            />
-          ))}
+              className="px-2 py-1 rounded-lg text-[10px] font-golos"
+              style={{ background: `${nextStep.color}20`, color: `${nextStep.color}cc` }}
+            >
+              {nextStep.duration} сек
+            </div>
+          )}
         </div>
       </div>
     </div>
