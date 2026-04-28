@@ -1,5 +1,7 @@
 import { useState } from "react";
 import Icon from "@/components/ui/icon";
+import ActiveWorkoutScreen from "@/components/ActiveWorkoutScreen";
+import WorkoutFinishScreen from "@/components/WorkoutFinishScreen";
 
 interface Props {
   onBack: () => void;
@@ -103,6 +105,20 @@ export default function WorkoutDetailScreen({ onBack }: Props) {
   const [activeTab, setActiveTab] = useState<"overview" | "exercises">("overview");
   const [expanded, setExpanded] = useState<number | null>(null);
   const [liked, setLiked] = useState(false);
+  const [screen, setScreen] = useState<"detail" | "active" | "finish">("detail");
+
+  if (screen === "active") {
+    return (
+      <ActiveWorkoutScreen
+        onBack={() => setScreen("detail")}
+        onFinish={() => setScreen("finish")}
+      />
+    );
+  }
+
+  if (screen === "finish") {
+    return <WorkoutFinishScreen onDone={onBack} />;
+  }
 
   return (
     <div className="flex flex-col h-full overflow-y-auto">
@@ -344,6 +360,7 @@ export default function WorkoutDetailScreen({ onBack }: Props) {
       {/* CTA */}
       <div className="flex-shrink-0 bg-white px-5 pt-3 pb-6 border-t border-gray-100">
         <button
+          onClick={() => setScreen("active")}
           className="w-full py-4 rounded-2xl text-base font-bold text-white font-montserrat flex items-center justify-center gap-2 transition-all active:scale-95"
           style={{
             background: "linear-gradient(135deg, #4A90E2 0%, #2d5be3 100%)",
